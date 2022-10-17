@@ -31,7 +31,7 @@ def get_user_input() -> dict:
 
     while True:
         temp_distro_name = input(
-            "\033[94m" + "Available options: Ubuntu(default, recommended), Debian, Arch, Fedora, Pop!_OS\n"
+            "\033[94m" + "Available options: Ubuntu(default, recommended), Debian, Arch, Fedora, Pop!_OS, Manjaro\n"
             + "\033[0m")
         match temp_distro_name:
             case "Ubuntu" | "ubuntu" | "":
@@ -90,6 +90,10 @@ def get_user_input() -> dict:
                 print("Pop!_OS selected")
                 output_dict["distro_name"] = "pop-os"
                 break
+            case "Manjaro" | "manjaro":
+                print("Manjaro selected")
+                output_dict["distro_name"] = "manjaro"
+                break
 
             case _:
                 print_warning("Check your spelling and try again")
@@ -110,6 +114,9 @@ def get_user_input() -> dict:
             case "fedora":
                 available_de = "Gnome(default, recommended), KDE(recommended), MATE, Xfce(recommended for weak device" \
                                "s), LXQt(recommended for weak devices), deepin, cli"
+            case "manjaro":
+                available_de = "Gnome(default, recommended), KDE(recommended), Xfce(recommended for weak device" \
+                               "s), cli"
 
         while True:
             temp_de_name = input("\033[94m" + "Available options: " + available_de + "\033[0m" + "\n")
@@ -123,6 +130,9 @@ def get_user_input() -> dict:
                     output_dict["de_name"] = "kde"
                     break
                 case "MATE" | "mate":
+                    if output_dict["distro_name"] == "manjaro":
+                        print_warning("MATE is not available for Manjaro, please choose another DE")
+                    else:
                     print("MATE selected")
                     output_dict["de_name"] = "mate"
                     break
@@ -131,19 +141,22 @@ def get_user_input() -> dict:
                     output_dict["de_name"] = "xfce"
                     break
                 case "lxqt" | "Lxqt":
+                    if output_dict["distro_name"] == "manjaro":
+                        print_warning("Lxqt is not available for Manjaro, please choose another DE")
+                    else:
                     print("Lxqt selected")
                     output_dict["de_name"] = "lxqt"
                     break
                 case "deepin":
-                    if output_dict["distro_name"] == "debian" or output_dict["distro_name"] == "ubuntu":
-                        print_warning("Deepin is not available for Debian/Ubuntu, please choose another DE")
+                    if output_dict["distro_name"] == "debian" or output_dict["distro_name"] == "ubuntu" or output_dict["distro_name"] == "manjaro":
+                        print_warning("Deepin is not available for Debian/Ubuntu/Manjaro, please choose another DE")
                     else:
                         print("Deepin selected")
                         output_dict["de_name"] = "deepin"
                         break
                 case "budgie":
-                    if output_dict["distro_name"] == "fedora":
-                        print_warning("Budgie is not available for Fedora, please choose another DE")
+                    if output_dict["distro_name"] == "fedora" or output_dict["distro_name"] == "manjaro":
+                        print_warning("Budgie is not available for Fedora/Manjaro, please choose another DE")
                     else:
                         print("Budgie selected")
                         output_dict["de_name"] = "budgie"
