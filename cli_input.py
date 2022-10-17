@@ -170,6 +170,8 @@ def get_user_input() -> dict:
                         break
                 case _:
                     print_warning("No such Desktop environment. Check your spelling and try again")
+        if output_dict["distro_name"] == "manjaro":
+            output_dict["distro_link"] = output_dict["de_name"]
     else:
         output_dict["de_name"] = "gnome"
 

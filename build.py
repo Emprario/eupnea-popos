@@ -196,9 +196,9 @@ def download_rootfs(distro_name: str, distro_version: str, distro_link: str) -> 
                 stop_download_progress()
             case "manjaro":
                 start_download_progress("/tmp/depthboot-build/manjaro.iso")
-                urlretrieve(distro_link, filename="/tmp/depthboot-build/manjaro.iso")
-                stop_download_progress()
-
+                urlretrieve(
+                    f"https://download.manjaro.org/{distro_link}/21.3.7/manjaro-{distro_link}-21.3.7-220816-linux515.iso",
+                    filename="/tmp/depthboot-build/manjaro.iso")
                 stop_download_progress()
     except URLError:
         print_error("Couldn't download rootfs. Check your internet connection and try again. If the error persists, "
