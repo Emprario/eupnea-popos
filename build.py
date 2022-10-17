@@ -93,7 +93,7 @@ def prepare_host(de_name: str) -> None:
             exit(1)
 
     # install unsquashfs for pop-os
-    if de_name == "pop-os" and not path_exists("/usr/bin/unsquashfs"):
+    if de_name == "pop-os" or de_name == "manjaro" and not path_exists("/usr/bin/unsquashfs"):
         print_status("Installing unsquashfs")
         if path_exists("/usr/bin/apt"):
             bash("apt-get install squashfs-tools -y")
@@ -193,6 +193,12 @@ def download_rootfs(distro_name: str, distro_version: str, distro_link: str) -> 
                 urlretrieve(
                     "https://iso.pop-os.org/22.04/amd64/intel/14/pop-os_22.04_amd64_intel_14.iso",
                     filename="/tmp/depthboot-build/pop-os.iso")
+                stop_download_progress()
+            case "manjaro":
+                start_download_progress("/tmp/depthboot-build/manjaro.iso")
+                urlretrieve(distro_link, filename="/tmp/depthboot-build/manjaro.iso")
+                stop_download_progress()
+
                 stop_download_progress()
     except URLError:
         print_error("Couldn't download rootfs. Check your internet connection and try again. If the error persists, "
