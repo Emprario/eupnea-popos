@@ -185,16 +185,17 @@ def download_rootfs(distro_name: str, distro_version: str, distro_link: str) -> 
             case "fedora":
                 print_status(f"Downloading fedora rootfs version: {distro_version}")
                 start_download_progress("/tmp/depthboot-build/fedora-rootfs.raw.xz")
-                urlretrieve(distro_link, filename="/tmp/depthboot-build/fedora-rootfs.raw.xz")
+                urlretrieve(distro_link, filename="/tmp/depchthboot-build/fedora-rootfs.raw.xz")
                 stop_download_progress()
             case "pop-os":
-                print_status(f"Downloading Pop!_OS iso {distro_version}")
+                print_status(f"Downloading Pop!_OS iso")
                 start_download_progress("/tmp/depthboot-build/pop-os.iso")
                 urlretrieve(
                     "https://iso.pop-os.org/22.04/amd64/intel/14/pop-os_22.04_amd64_intel_14.iso",
                     filename="/tmp/depthboot-build/pop-os.iso")
                 stop_download_progress()
             case "manjaro":
+            print_status(f"Downloading Manjaro iso")
                 start_download_progress("/tmp/depthboot-build/manjaro.iso")
                 urlretrieve(
                     f"https://download.manjaro.org/{distro_link}/21.3.7/manjaro-{distro_link}-21.3.7-220816-linux515.iso",
