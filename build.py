@@ -195,7 +195,7 @@ def download_rootfs(distro_name: str, distro_version: str, distro_link: str) -> 
                     filename="/tmp/depthboot-build/pop-os.iso")
                 stop_download_progress()
             case "manjaro":
-            print_status(f"Downloading Manjaro iso")
+                print_status(f"Downloading Manjaro iso")
                 start_download_progress("/tmp/depthboot-build/manjaro.iso")
                 urlretrieve(
                     f"https://download.manjaro.org/{distro_link}/21.3.7/manjaro-{distro_link}-21.3.7-220816-linux515.iso",
@@ -406,6 +406,18 @@ def extract_rootfs(distro_name: str) -> None:
                 bash(f"losetup -d {mnt_iso} ")
             except subprocess.CalledProcessError:
                 pass  # on crostini umount fails for some reason
+        case "manjaro":
+            print_status("Extracting Manjaro base squashfs from iso. This may take a long while")
+            # Create a mount point for the iso to extract the squashfs
+            mkdir("/tmp/depthboot-build/iso")
+            mnt_iso = bash(f"losetup -f --show /tmp/depthboot-build/manjaro.iso")
+            mkdir("/tmp/depthboot-build/cdrom")
+            bash(f"mount {mnt_iso} /tmp/depthboot-build/cdrom")
+            start_progress()  # start fake progress
+            bash("unsquashfs -f -d /mnt/depthboot /tmp/depthboot-build/cdrom/manjaro/x86_64/rootfs.sfs")
+            stop_progress()  # stop fake progress
+            # Not destroy loop device, will be usefull for D.E. installation
+
 
     print_status("\n" + "Rootfs extraction complete")
 
@@ -503,7 +515,7 @@ def post_extract(build_options, kernel_type: str) -> None:
         match build_options["distro_name"]:
             case "ubuntu" | "debian":
                 chroot(f"usermod -aG sudo {username}")
-            case "arch" | "fedora":
+            case "arch" | "fedora" | "manjaro":
                 chroot(f"usermod -aG wheel {username}")
 
         # set timezone build system timezone on device
@@ -636,6 +648,8 @@ def start_build(verbose: bool, local_path, kernel_type: str, dev_release: bool, 
             import distro.fedora as distro
         case "pop-os":
             import distro.popos as distro
+        case "manjaro":
+            import distro.manjaro as distro
         case _:
             print_error("DISTRO NAME NOT FOUND! Please create an issue")
             exit(1)

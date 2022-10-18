@@ -133,9 +133,9 @@ def get_user_input() -> dict:
                     if output_dict["distro_name"] == "manjaro":
                         print_warning("MATE is not available for Manjaro, please choose another DE")
                     else:
-                    print("MATE selected")
-                    output_dict["de_name"] = "mate"
-                    break
+                        print("MATE selected")
+                        output_dict["de_name"] = "mate"
+                        break
                 case "xfce" | "Xfce":
                     print("Xfce selected")
                     output_dict["de_name"] = "xfce"
@@ -144,9 +144,9 @@ def get_user_input() -> dict:
                     if output_dict["distro_name"] == "manjaro":
                         print_warning("Lxqt is not available for Manjaro, please choose another DE")
                     else:
-                    print("Lxqt selected")
-                    output_dict["de_name"] = "lxqt"
-                    break
+                        print("Lxqt selected")
+                        output_dict["de_name"] = "lxqt"
+                        break
                 case "deepin":
                     if output_dict["distro_name"] == "debian" or output_dict["distro_name"] == "ubuntu" or output_dict["distro_name"] == "manjaro":
                         print_warning("Deepin is not available for Debian/Ubuntu/Manjaro, please choose another DE")
