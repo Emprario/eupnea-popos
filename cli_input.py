@@ -1,96 +1,87 @@
 #!/usr/bin/env python3
 
-from typing import Tuple
-import json
 from getpass import getpass
 from functions import *
 
 
 def get_user_input() -> dict:
     output_dict = {
-        "distro_name": "ubuntu",
+        "distro_name": "",
         "distro_version": "",
-        "distro_link": "",
-        "de_name": "cli",
+        "de_name": "",
         "username": "localuser",
         "password": "",
         "hostname": "depthboot-chromebook",
         "device": "image",
         "rebind_search": False
     }
-    with open("distro_links.json", "r") as file:
-        distros = json.load(file)
-
     # Print welcome message
     print_header("Welcome to Depthboot, formerly known as Breath")
-    print_header("This script will create a bootable Depthboot USB-drive/SD-card/image for you.")
+    print_header("This script will create a bootable Linux USB-drive/SD-card/image for you.")
     print_header("You will now be asked a few questions. If you dont know what to answer, just press 'enter' and the"
-                 " recommended answer will be used.")
+                 " recommended answer will be selected.")
     input("(Press enter to continue)")
     print_question("Which Linux distro(flavor) would you like to use?")
-
     while True:
         temp_distro_name = input(
-            "\033[94m" + "Available options: Ubuntu(default, recommended), Debian, Arch, Fedora, Pop!_OS\n"
-            + "\033[0m")
+            "\033[94m" + "Available options: Pop!_OS(default, recommended), Ubuntu, Fedora, Debian, Arch\n" + "\033[0m")
         match temp_distro_name:
-            case "Ubuntu" | "ubuntu" | "":
+            case "Ubuntu" | "ubuntu":
                 output_dict["distro_name"] = "ubuntu"
                 while True:
                     print_question("Use latest Ubuntu version?")
-                    output_dict["distro_version"] = input("\033[94m" + "Press enter for yes, or type in the version "
-                                                                       "number(example: '21.10'): " + "\033[0m")
-                    if output_dict["distro_version"] == "":
-                        # get highest version number
-                        output_dict["distro_version"] = max(distros["ubuntu"])
+                    temp_input = input("\033[94m" + "Press enter for yes(22.10), or type 'LTS' to use the latest "
+                                                    "lts version(22.04): " + "\033[0m")
+                    if temp_input == "":
+                        output_dict["distro_version"] = "22.10"
+                        print("Using Ubuntu version: " + output_dict["distro_version"])
+                        break
+                    elif temp_input == "LTS" or temp_input == "lts":
+                        output_dict["distro_version"] = "22.04"
                         print("Ubuntu: " + output_dict["distro_version"] + " selected")
                         break
                     else:
-                        if output_dict["distro_version"] in distros["ubuntu"]:
-                            print("Ubuntu: " + output_dict["distro_version"] + " selected")
-                            break
-                        else:
-                            print_warning("Version not available, please choose another")
-                            continue
+                        print_warning("Version not available, please choose another")
+                        continue
                 break
             case "Debian" | "debian":
-                print("Debian stable selected")
-                output_dict["distro_name"] = "debian"
-                # TODO: Add non stable debian versions
-                break
+                print_warning("Warning: The audio and some postinstall scripts are not supported on debian by default.")
+                if input("\033[94mType 'yes' to continue anyways or Press Enter to choose another distro" +
+                         "\033[0m\n") == "yes":
+                    print("Debian stable selected")
+                    output_dict["distro_name"] = "debian"
+                    output_dict["distro_version"] = "stable"
+                    # TODO: Add non stable debian versions
+                    break
+                continue
             case "Arch" | "arch" | "arch btw":
                 print("Arch selected")
                 output_dict["distro_name"] = "arch"
-                output_dict["distro_link"] = distros["arch"]
+                output_dict["distro_version"] = "latest"
                 break
             case "Fedora" | "fedora":
                 output_dict["distro_name"] = "fedora"
                 while True:
-                    print_question("Use latest Fedora version?")
-                    output_dict["distro_version"] = input("\033[94m" + "Press enter for yes, or type in the version "
-                                                                       "number(example: '36'): " + "\033[0m")
-                    if output_dict["distro_version"] == "":
-                        # remove rawhide, then get the highest version number
-                        temp_fedora_dict = distros["fedora"]
-                        temp_fedora_dict.pop("Rawhide")
-                        output_dict["distro_version"] = max(temp_fedora_dict)
-                        output_dict["distro_link"] = distros["fedora"][output_dict["distro_version"]]
+                    print_question("Use latest stable Fedora version?")
+                    temp_input = input("\033[94m" + "Press enter for yes(37), or type 'beta' to use the latest "
+                                                    "beta(38):" + "\033[0m")
+                    if temp_input == "":
+                        output_dict["distro_version"] = "37"
                         print("Using Fedora version: " + output_dict["distro_version"])
                         break
+                    elif temp_input == "Beta" or temp_input == "beta":
+                        output_dict["distro_version"] = "38"
+                        print("Fedora: " + output_dict["distro_version"] + " selected")
+                        break
                     else:
-                        if output_dict["distro_version"] in distros["fedora"]:
-                            output_dict["distro_link"] = distros["fedora"][output_dict["distro_version"]]
-                            print("Fedora: " + output_dict["distro_version"] + " selected")
-                            break
-                        else:
-                            print_warning("Version not available, please choose another")
-                            continue
+                        print_warning("Version not available, please choose another")
+                        continue
                 break
-            case "Pop!_OS" | "PopOS" | "POP!_OS" | "Pop_OS" | "Pop!OS" | "pop!_os" | "popos" | "pop-os":
+            case "Pop!_OS" | "PopOS" | "POP!_OS" | "Pop_OS" | "Pop!OS" | "pop!_os" | "popos" | "pop-os" | "":  # default
                 print("Pop!_OS selected")
                 output_dict["distro_name"] = "pop-os"
+                output_dict["distro_version"] = "22.04"
                 break
-
             case _:
                 print_warning("Check your spelling and try again")
                 continue
@@ -99,17 +90,17 @@ def get_user_input() -> dict:
         print_question("Which desktop environment(Desktop GUI) would you like to use?")
         match output_dict["distro_name"]:
             case "ubuntu":
-                available_de = "Gnome(default, recommended), KDE(recommended), MATE, Xfce(recommended for weak device" \
-                               "s), LXQt(recommended for weak devices), budgie, cli"
+                available_de = "Gnome(default, recommended), KDE(recommended), Xfce(recommended for weak devices), " \
+                               "LXQt(recommended for weak devices), cli"
             case "debian":
-                available_de = "Gnome(default, recommended), KDE(recommended), MATE, Xfce(recommended for weak device" \
+                available_de = "Gnome(default, recommended), KDE(recommended), Xfce(recommended for weak device" \
                                "s), LXQt(recommended for weak devices), budgie, cli"
             case "arch":
-                available_de = "Gnome(default, recommended), KDE(recommended), MATE, Xfce(recommended for weak device" \
-                               "s), LXQt(recommended for weak devices), deepin, budgie, cli"
-            case "fedora":
-                available_de = "Gnome(default, recommended), KDE(recommended), MATE, Xfce(recommended for weak device" \
+                available_de = "Gnome(default, recommended), KDE(recommended), Xfce(recommended for weak device" \
                                "s), LXQt(recommended for weak devices), deepin, cli"
+            case "fedora":
+                available_de = "Gnome(default, recommended), KDE(recommended), Xfce(recommended for weak device" \
+                               "s), LXQt(recommended for weak devices), deepin, budgie, cli"
 
         while True:
             temp_de_name = input("\033[94m" + "Available options: " + available_de + "\033[0m" + "\n")
@@ -122,10 +113,6 @@ def get_user_input() -> dict:
                     print("KDE selected")
                     output_dict["de_name"] = "kde"
                     break
-                case "MATE" | "mate":
-                    print("MATE selected")
-                    output_dict["de_name"] = "mate"
-                    break
                 case "xfce" | "Xfce":
                     print("Xfce selected")
                     output_dict["de_name"] = "xfce"
@@ -135,15 +122,19 @@ def get_user_input() -> dict:
                     output_dict["de_name"] = "lxqt"
                     break
                 case "deepin":
-                    if output_dict["distro_name"] == "debian" or output_dict["distro_name"] == "ubuntu":
-                        print_warning("Deepin is not available for Debian/Ubuntu, please choose another DE")
+                    if output_dict["distro_name"] == "debian":
+                        print_warning("Deepin is not available for Debian, please choose another DE")
+                    elif output_dict["distro_name"] == "ubuntu":
+                        print_warning("Deepin is currently broken upstream in Ubuntu, please choose another DE")
                     else:
                         print("Deepin selected")
                         output_dict["de_name"] = "deepin"
                         break
                 case "budgie":
-                    if output_dict["distro_name"] == "fedora":
-                        print_warning("Budgie is not available for Fedora, please choose another DE")
+                    if output_dict["distro_name"] == "ubuntu":
+                        print_warning("Budgie is currently broken in Ubuntu, please choose another DE")
+                    elif output_dict["distro_name"] == "arch":
+                        print_warning("Budgie is currently broken in Arch, please choose another DE")
                     else:
                         print("Budgie selected")
                         output_dict["de_name"] = "budgie"
@@ -158,10 +149,12 @@ def get_user_input() -> dict:
                 case _:
                     print_warning("No such Desktop environment. Check your spelling and try again")
     else:
-        output_dict["de_name"] = "gnome"
+        # TODO: set to gnome when gnome is fixed
+        output_dict["de_name"] = "popos"  # set to gnome
 
     # Gnome has a first time setup -> skip this part for gnome, as there will be a first time setup
-    if not output_dict["de_name"] == "gnome":
+    # TODO: set to gnome when gnome is fixed
+    if not output_dict["de_name"] == "popos":
         print_question("Enter a username for the new user")
         while True:
             output_dict["username"] = input("\033[94m" + "Username(default: 'localuser'): " + "\033[0m")
@@ -225,7 +218,7 @@ def get_user_input() -> dict:
             print(f"Using {output_dict['hostname']} as hostname")
             break
 
-    print_question("Would you like to rebind the Search/Super/Win key to Caps Lock?(NOT RECOMMENDED)")
+    print_question("Rebind the Search/Super/Win key to Caps Lock?(NOT RECOMMENDED)")
     if input("\033[94m" + "Type yes to rebind. Press enter to keep old binding: " "\033[0m") == "yes":
         print("Search key will be a CAPS LOCK key")
         rebind_search = True
@@ -238,7 +231,7 @@ def get_user_input() -> dict:
         lsblk_out = bash("lsblk -nd -o NAME,MODEL,SIZE,TRAN").splitlines()
         for line in lsblk_out:
             # MassStorageClass is not a real device, so ignore it
-            if not line.find("usb") == -1 and line.find("MassStorageClass") == -1:  # Print USB devices only
+            if not line.find("usb") == -1 and line.find("0B") == -1:  # Print USB devices only with storage
                 usb_array.append(line[:3])
                 print(line[:-3])  # this is for the user to see the list
         if len(usb_array) == 0:

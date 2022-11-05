@@ -25,13 +25,12 @@ def config(de_name: str, distro_version: str, username: str, root_partuuid: str,
     print_status("Preparing pacman")
     chroot("pacman-key --init")
     chroot("pacman-key --populate archlinux")
-    chroot("pacman -Syy --noconfirm")
-    chroot("pacman -Syu --noconfirm")
+    chroot("pacman -Syyu --noconfirm")  # update the whole system
 
     print_status("Installing packages")
     start_progress()  # start fake progress
-    chroot("pacman -S --noconfirm base base-devel nano networkmanager xkeyboard-config linux-firmware sudo cloud-utils "
-           "dmidecode")
+    chroot("pacman -S --noconfirm base base-devel nano networkmanager xkeyboard-config linux-firmware sudo")
+    chroot("pacman -S --noconfirm git cloud-utils rsync")  # postinstall script dependencies
     stop_progress()  # stop fake progress
 
     print_status("Downloading and installing de, might take a while")
@@ -43,14 +42,8 @@ def config(de_name: str, distro_version: str, username: str, root_partuuid: str,
             chroot("systemctl enable gdm.service")
         case "kde":
             print_status("Installing KDE")
-            chroot("pacman -S --noconfirm plasma-meta plasma-wayland-session kde-applications")
+            chroot("pacman -S --noconfirm plasma-meta plasma-wayland-session kde-applications packagekit-qt5")
             chroot("systemctl enable sddm.service")
-        case "mate":
-            print_status("Installing MATE")
-            # no wayland support in mate
-            chroot("pacman -S --noconfirm mate mate-extra xorg xorg-server lightdm lightdm-gtk-greeter firefox "
-                   "network-manager-applet nm-connection-editor")
-            chroot("systemctl enable lightdm.service")
         case "xfce":
             print_status("Installing Xfce")
             # no wayland support in xfce
@@ -60,12 +53,12 @@ def config(de_name: str, distro_version: str, username: str, root_partuuid: str,
         case "lxqt":
             print_status("Installing LXQt")
             chroot("pacman -S --noconfirm lxqt breeze-icons xorg xorg-server sddm firefox networkmanager-qt "
-                   "network-manager-applet nm-connection-editor discover")
+                   "network-manager-applet nm-connection-editor discover packagekit-qt5")
             chroot("systemctl enable sddm.service")
         case "deepin":
             print_status("Installing deepin")
             chroot("pacman -S --noconfirm deepin deepin-kwin deepin-extra xorg xorg-server lightdm kde-applications "
-                   "firefox")
+                   "firefox discover packagekit-qt5")
             # enable deepin specific login style
             with open("/mnt/depthboot/etc/lightdm/lightdm.conf", "a") as conf:
                 conf.write("greeter-session=lightdm-deepin-greeter")
@@ -73,7 +66,7 @@ def config(de_name: str, distro_version: str, username: str, root_partuuid: str,
         case "budgie":
             print_status("Installing Budgie")
             chroot("pacman -S --noconfirm budgie-desktop budgie-desktop-view budgie-screensaver budgie-control-center "
-                   "lightdm lightdm-gtk-greeter")
+                   "lightdm lightdm-gtk-greeter xorg xorg-server network-manager-applet")
             chroot("systemctl enable lightdm.service")
         case "cli":
             print_status("Skipping desktop environment install")
@@ -102,17 +95,6 @@ def config(de_name: str, distro_version: str, username: str, root_partuuid: str,
     temp_pacman[34] = temp_pacman[34][1:]
     with open("/mnt/depthboot/etc/pacman.conf", "w") as conf:
         conf.writelines(temp_pacman)
-
-    # TODO: add depthboot to arch name
-    # Add depthboot to version(this is purely cosmetic)
-    with open("/mnt/depthboot/etc/os-release", "r") as f:
-        os_release = f.readlines()
-    os_release[0] = os_release[0][:-2] + ' (Depthboot)"\n'
-    os_release[1] = os_release[1][:-2] + ' (Depthboot)"\n'
-    with open("/mnt/depthboot/etc/os-release", "w") as f:
-        f.writelines(os_release)
-
-    print_status("Arch configuration complete")
 
 
 # using arch-chroot for arch

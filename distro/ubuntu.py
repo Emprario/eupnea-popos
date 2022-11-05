@@ -5,13 +5,26 @@ def config(de_name: str, distro_version: str, username: str, root_partuuid: str,
     set_verbose(verbose)
     print_status("Configuring Ubuntu")
 
+    ubuntu_versions_codenames = {
+        "18.04": "bionic",
+        "20.04": "focal",
+        "21.04": "hirsute",
+        "22.04": "jammy",
+        "22.10": "kinetic"
+    }
+    # add missing apt sources
+    with open("/mnt/depthboot/etc/apt/sources.list", "a") as file:
+        file.write(f"\ndeb http://archive.ubuntu.com/ubuntu {ubuntu_versions_codenames[distro_version]}-backports main "
+                   "restricted universe multiverse\n")
+        file.write(f"\ndeb http://security.ubuntu.com/ubuntu {ubuntu_versions_codenames[distro_version]}-security main"
+                   f" restricted universe multiverse\n")
+        file.write(f"\ndeb http://archive.ubuntu.com/ubuntu {ubuntu_versions_codenames[distro_version]}-updates main "
+                   f"restricted universe multiverse\n")
+
     print_status("Installing dependencies")
     chroot("apt-get update -y")
-    chroot("apt-get install -y linux-firmware network-manager software-properties-common cloud-utils")
-
-    # TODO: Find out why we need to reinstall dbus
-    print("Reinstalling dbus")
-    chroot("apt-get reinstall -y dbus")
+    chroot("apt-get install -y linux-firmware network-manager software-properties-common")
+    chroot("apt-get install -y git cgpt vboot-kernel-utils cloud-utils rsync")  # postinstall dependencies
 
     print_status("Downloading and installing de, might take a while")
     start_progress()  # start fake progress
@@ -21,35 +34,32 @@ def config(de_name: str, distro_version: str, username: str, root_partuuid: str,
             chroot("apt-get install -y ubuntu-desktop gnome-software epiphany-browser")
         case "kde":
             print_status("Installing KDE")
-            chroot("apt-get install -y kde-standard")
-        case "mate":
-            print_status("Installing MATE")
-            chroot("apt-get install -y ubuntu-mate-desktop gnome-software epiphany-browser")
+            chroot("DEBIAN_FRONTEND=noninteractive apt-get install -y kde-standard")
         case "xfce":
             print_status("Installing Xfce")
-            chroot("apt-get install -y --no-install-recommends xubuntu-desktop gnome-software epiphany-browser")
+            chroot("apt-get install -y --no-install-recommends xubuntu-desktop network-manager-gnome gnome-software "
+                   "epiphany-browser")
             chroot("apt-get install -y xfce4-goodies")
         case "lxqt":
             print_status("Installing LXQt")
             chroot("apt-get install -y lubuntu-desktop discover konqueror")
         case "deepin":
             print_status("Installing deepin")
-            print_error("Deepin is currently broken on Ubuntu, please select another DE")
-            exit(1)
 
-            # Probably to some misconfiguration in deepin's installer, our kernel version is not supported.
+            # Probably due to some misconfiguration in deepin's installer, our kernel version is not supported.
             # Install fails with: Errors were encountered while processing: deepin-anything-dkms, dde-file-manager,
             # ubuntudde-dde, deepin-anything-server
 
             # TODO: Fix deepin
-            # chroot("add-apt-repository -y ppa:ubuntudde-dev/stable")
-            # chroot("apt-get update -y")
-            # chroot("apt-get install -y ubuntudde-dde")
+            chroot("add-apt-repository -y ppa:ubuntudde-dev/stable")
+            chroot("apt-get update -y")
+            chroot("apt-get install -y ubuntudde-dde")
         case "budgie":
             print_status("Installing Budgie")
             # do not install tex-common, it breaks the installation
-            chroot("DEBIAN_FRONTEND=noninteractive apt-get install -y ubuntu-budgie-desktop tex-common-")
-            chroot("dpkg-reconfigure lightdm")
+            chroot("DEBIAN_FRONTEND=noninteractive apt-get install -y ubuntu-budgie-desktop tex-common- lightdm "
+                   "lightdm-gtk-greeter")
+            chroot("systemctl enable lightdm.service")
         case "cli":
             print_status("Skipping desktop environment install")
         case _:
@@ -70,28 +80,10 @@ def config(de_name: str, distro_version: str, username: str, root_partuuid: str,
         pass
     print_status("Desktop environment setup complete")
 
-    # TODO: Figure out if removing needrestart is necessary
-    chroot("apt-get remove -y needrestart")
-
-    # The default fstab file causes systemd-remount-fs to fail
-    with open("configs/fstab/ubuntu.fstab", "r") as f:
-        fstab = f.read()
-    fstab = fstab.replace("insert_partuuid", root_partuuid)
-    with open("/mnt/depthboot/etc/fstab", "w") as f:
-        f.write(fstab)
-
     # Replace input-synaptics with newer input-libinput, for better touchpad support
     print_status("Upgrading touchpad drivers")
     chroot("apt-get remove -y xserver-xorg-input-synaptics")
     # chroot("apt-get install -y xserver-xorg-input-libinput")
-
-    # Add depthboot to version(this is purely cosmetic)
-    with open("/mnt/depthboot/etc/os-release", "r") as f:
-        os_release = f.readlines()
-    os_release[1] = os_release[1][:-2] + ' (Depthboot)"\n'
-    os_release[4] = os_release[4][:-2] + ' (Depthboot)"\n'
-    with open("/mnt/depthboot/etc/os-release", "w") as f:
-        f.writelines(os_release)
 
     print_status("Ubuntu setup complete")
 

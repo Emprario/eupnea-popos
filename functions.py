@@ -21,7 +21,7 @@ def rmdir(rm_dir: str, keep_dir: bool = True) -> None:
                 else:
                     unlink_files(path_to_rm)
         except FileNotFoundError:
-            print(f"No such file or directory: {path_to_rm.absolute().as_posix()}, ignoring")
+            print(f"Couldn't remove non existent directory: {path_to_rm}, ignoring")
             pass
 
     # convert string to Path object
@@ -41,7 +41,7 @@ def rmdir(rm_dir: str, keep_dir: bool = True) -> None:
 
 # remove a single file
 def rmfile(file: str, force: bool = False) -> None:
-    if force:
+    if force:  # for symbolic links
         Path(file).unlink(missing_ok=True)
     file_as_path = Path(file)
     if file_as_path.exists():
@@ -111,30 +111,15 @@ def cpfile(src_as_str: str, dst_as_str: str) -> None:  # "/etc/resolv.conf", "/v
 
 
 #######################################################################################
-#                               SUBPROCESS FUNCTIONS                                  #
+#                               BASH FUNCTIONS                                        #
 #######################################################################################
 
 # return the output of a command
 def bash(command: str) -> str:
     output = subprocess.check_output(command, shell=True, text=True).strip()
     if verbose:
-        print(output)
+        print(output, flush=True)
     return output
-
-
-#######################################################################################
-#                                    MISC STUFF                                       #
-#######################################################################################
-
-def set_verbose(new_state: bool) -> None:
-    global verbose
-    verbose = new_state
-
-
-# This is for non-interactive shells
-def disable_download_progress() -> None:
-    global disable_download
-    disable_download = True
 
 
 def install_kernel_packages() -> None:
@@ -170,6 +155,21 @@ def install_kernel_packages() -> None:
         bash("sudo zypper --non-interactive install vboot")
 
 
+#######################################################################################
+#                                    MISC STUFF                                       #
+#######################################################################################
+
+def set_verbose(new_state: bool) -> None:
+    global verbose
+    verbose = new_state
+
+
+# This is for non-interactive shells
+def disable_download_progress() -> None:
+    global disable_download
+    disable_download = True
+
+
 def prevent_idle() -> None:
     Thread(target=__prevent_idle, daemon=True).start()
 
@@ -180,7 +180,7 @@ def __prevent_idle():
 
 
 #######################################################################################
-#                                    PROCESS MONITOR FUNCTIONS                        #
+#                              PROGRESS MONITOR FUNCTIONS                             #
 #######################################################################################
 def start_progress(force_show: bool = False) -> None:
     if not force_show and verbose:
@@ -192,8 +192,7 @@ def start_progress(force_show: bool = False) -> None:
 def stop_progress(force_show: bool = False) -> None:
     if not force_show and verbose:
         return
-    with open(".stop_progress", "w") as file:
-        file.write("")
+    open(".stop_progress", "a").close()
     sleep(3)
     print("\n", end="")
 
@@ -205,8 +204,7 @@ def start_download_progress(file_path_str: str) -> None:
 
 
 def stop_download_progress() -> None:
-    with open(".stop_download_progress", "w") as file:
-        file.write("")
+    open(".stop_download_progress", "a").close()
     sleep(1)
     print("\n", end="")
 
@@ -234,6 +232,35 @@ def __print_download_progress(file_path: Path) -> None:
 #######################################################################################
 #                                    PRINT FUNCTIONS                                  #
 #######################################################################################
+
+# tree implementation in python
+# Credit: https://stackoverflow.com/a/59109706
+def create_tree(dir_str: str) -> str:
+    # TODO: sort alphabetically
+    def tree(dir_path: Path, prefix: str = ''):
+        # prefix components:
+        space = '    '
+        branch = '│   '
+        # pointers:
+        tee = '├── '
+        last = '└── '
+
+        dir_path.iterdir()
+        contents = list(dir_path.iterdir())
+        # contents each get pointers that are ├── with a final └── :
+        pointers = [tee] * (len(contents) - 1) + [last]
+        for pointer, path in zip(pointers, contents):
+            yield prefix + pointer + path.name
+            if path.is_dir():  # extend the prefix and recurse:
+                extension = branch if pointer == tee else space
+                # i.e. space because last, └── , above so no more |
+                yield from tree(path, prefix=prefix + extension)
+
+    final_tree = dir_str + "\n"
+    for line in tree(Path(dir_str)):
+        final_tree += line + "\n"
+    return final_tree
+
 
 def print_warning(message: str) -> None:
     print("\033[93m" + message + "\033[0m", flush=True)

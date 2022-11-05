@@ -15,7 +15,8 @@ def config(de_name: str, distro_version: str, username: str, root_partuuid: str,
     chroot("apt-get update -y")
     # Install dependencies
     chroot("apt-get install -y network-manager sudo firmware-linux-free cloud-utils firmware-linux-nonfree "
-           "firmware-iwlwifi iw git")
+           "firmware-iwlwifi iw")
+    chroot("apt-get install -y git cgpt vboot-kernel-utils rsync")  # postinstall dependencies
     stop_progress()  # stop fake progress
 
     print_status("Downloading and installing de, might take a while")
@@ -28,23 +29,20 @@ def config(de_name: str, distro_version: str, username: str, root_partuuid: str,
         case "kde":
             print_status("Installing KDE")
             chroot("DEBIAN_FRONTEND=noninteractive apt-get install -y task-kde-desktop")
-        case "mate":
-            print_status("Installing MATE")
-            chroot("DEBIAN_FRONTEND=noninteractive apt-get install -y mate-desktop-environment "
-                   "mate-desktop-environment-extras gdm3")
         case "xfce":
             print_status("Installing Xfce")
-            chroot("DEBIAN_FRONTEND=noninteractive apt-get install -y task-xfce-desktop")
+            chroot("DEBIAN_FRONTEND=noninteractive apt-get install -y task-xfce-desktop gnome-software "
+                   "epiphany-browser")
         case "lxqt":
             print_status("Installing LXQt")
-            chroot("DEBIAN_FRONTEND=noninteractive apt-get install -y task-lxqt-desktop")
+            chroot("DEBIAN_FRONTEND=noninteractive apt-get install -y task-lxqt-desktop plasma-discover")
         case "deepin":
             print_error("Deepin is not available for Debian")
             exit(1)
         case "budgie":
             print_status("Installing Budgie")
             chroot("DEBIAN_FRONTEND=noninteractive apt-get install -y budgie-desktop budgie-indicator-applet "
-                   "budgie-core lightdm lightdm-gtk-greeter gnome-terminal firefox")
+                   "budgie-core lightdm lightdm-gtk-greeter gnome-terminal epiphany-browser gnome-software")
             chroot("systemctl enable lightdm.service")
         case "cli":
             print_status("Skipping desktop environment install")
@@ -96,16 +94,6 @@ def config(de_name: str, distro_version: str, username: str, root_partuuid: str,
         file.writelines(original_sources)
     chroot("apt-get update -y")
     '''
-
-    # Add depthboot to version(this is purely cosmetic)
-    with open("/mnt/depthboot/etc/os-release", "r") as f:
-        os_release = f.readlines()
-    os_release[0] = os_release[0][:-2] + ' (Depthboot)"\n'
-    os_release[1] = os_release[1][:-2] + ' (Depthboot)"\n'
-    os_release[3] = os_release[3][:-2] + ' (Depthboot)"\n'
-    with open("/mnt/depthboot/etc/os-release", "w") as f:
-        f.writelines(os_release)
-
     print_status("Debian setup complete")
 
 

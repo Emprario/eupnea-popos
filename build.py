@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from typing import Tuple
-from urllib.request import urlretrieve
+from urllib.request import urlretrieve, urlopen
 from urllib.error import URLError
 import json
 
@@ -10,22 +10,6 @@ from functions import *
 
 # Clean old depthboot files from /tmp
 def prepare_host(de_name: str) -> None:
-    print_status("Preparing host system")
-
-    # unmount fedora remains before attempting to remove /tmp/depthboot-build
-    try:
-        bash("umount -lf /tmp/depthboot-build/fedora-tmp-mnt 2>/dev/null")  # umount fedora temp if exists
-    except subprocess.CalledProcessError:
-        print("Failed to unmount /tmp/depthboot-build/fedora-tmp-mnt, ignore")
-        pass
-
-    # unmount cdrom remains before attempting to remove /tmp/depthboot-build
-    try:
-        bash("umount -lf /tmp/depthboot-build/cdrom 2>/dev/null")  # umount fedora temp if exists
-    except subprocess.CalledProcessError:
-        print("Failed to unmount /tmp/depthboot-build/cdrom, ignore")
-        pass
-
     print_status("Cleaning + preparing host system")
     rmdir("/tmp/depthboot-build")
     mkdir("/tmp/depthboot-build", create_parents=True)
@@ -45,6 +29,8 @@ def prepare_host(de_name: str) -> None:
 
     # Install dependencies
     install_kernel_packages()
+
+    # TODO: only install if building image
     # Install parted
     if not path_exists("/usr/sbin/parted"):
         print_status("Installing parted")
@@ -108,10 +94,9 @@ def prepare_host(de_name: str) -> None:
                           "another distro instead of Pop!_OS")
             exit(1)
 
-        # download kernel files from GitHub
 
-
-def download_kernel(kernel_type: str, dev_release: bool, files: list = ["bzImage", "modules", "headers"]) -> None:
+# download kernel files from GitHub
+def download_kernel(kernel_type: str, dev_release: bool, files: list = ["bzImage", "modules", "headers"]) -> str:
     # select correct link
     if dev_release:
         url = "https://github.com/eupnea-linux/kernel/releases/download/dev-build/"
@@ -150,13 +135,21 @@ def download_kernel(kernel_type: str, dev_release: bool, files: list = ["bzImage
             case "stable":
                 print_status("Downloading stable 5.10 kernel")
                 if "bzImage" in files:
-                    urlretrieve(f"{url}bzImage", filename="/tmp/depthboot-build/bzImage")
+                    urlretrieve(f"{url}bzImage-stable", filename="/tmp/depthboot-build/bzImage")
                 if "modules" in files:
-                    urlretrieve(f"{url}modules.tar.xz", filename="/tmp/depthboot-build/modules.tar.xz")
+                    urlretrieve(f"{url}modules-stable.tar.xz", filename="/tmp/depthboot-build/modules.tar.xz")
                 if "headers" in files:
-                    urlretrieve(f"{url}headers.tar.xz", filename="/tmp/depthboot-build/headers.tar.xz")
+                    urlretrieve(f"{url}headers-stable.tar.xz", filename="/tmp/depthboot-build/headers.tar.xz")
+
+        print_status("Getting kernel version")
+        if kernel_type == "mainline":
+            url = "https://api.github.com/repos/eupnea-linux/mainline-kernel/releases/latest"
+        else:
+            url = "https://api.github.com/repos/eupnea-linux/kernel/releases/latest"
+        return json.loads(urlopen(url).read())["tag_name"]
     except URLError:
         print_error("Failed to reach github. Check your internet connection and try again or use local files with -l")
+        print_warning("Dev releases may not always be available")
         exit(1)
 
     stop_progress()  # stop fake progress
@@ -164,35 +157,35 @@ def download_kernel(kernel_type: str, dev_release: bool, files: list = ["bzImage
 
 
 # download the distro rootfs
-def download_rootfs(distro_name: str, distro_version: str, distro_link: str) -> None:
+def download_rootfs(distro_name: str, distro_version: str) -> None:
     try:
         match distro_name:
             case "ubuntu":
-                print_status(f"Downloading ubuntu rootfs {distro_version}")
+                print_status(f"Downloading ubuntu rootfs version: {distro_version} from github")
                 start_download_progress("/tmp/depthboot-build/ubuntu-rootfs.tar.xz")
-                urlretrieve(
-                    f"https://cloud-images.ubuntu.com/releases/{distro_version}/release/ubuntu-{distro_version}"
-                    f"-server-cloudimg-amd64-root.tar.xz",
-                    filename="/tmp/depthboot-build/ubuntu-rootfs.tar.xz")
+                urlretrieve(f"https://github.com/eupnea-linux/ubuntu-rootfs/releases/latest/download/ubuntu-rootfs-"
+                            f"{distro_version}.tar.xz", filename="/tmp/depthboot-build/ubuntu-rootfs.tar.xz")
                 stop_download_progress()
             case "debian":
                 print_status("Debian is downloaded later, skipping download")
             case "arch":
                 print_status("Downloading latest arch rootfs")
                 start_download_progress("/tmp/depthboot-build/arch-rootfs.tar.gz")
-                urlretrieve(distro_link, filename="/tmp/depthboot-build/arch-rootfs.tar.gz")
+                urlretrieve("https://geo.mirror.pkgbuild.com/iso/latest/archlinux-bootstrap-x86_64.tar.gz",
+                            filename="/tmp/depthboot-build/arch-rootfs.tar.gz")
                 stop_download_progress()
             case "fedora":
-                print_status(f"Downloading fedora rootfs version: {distro_version}")
-                start_download_progress("/tmp/depthboot-build/fedora-rootfs.raw.xz")
-                urlretrieve(distro_link, filename="/tmp/depthboot-build/fedora-rootfs.raw.xz")
+                print_status(f"Downloading fedora rootfs version: {distro_version} from github")
+                start_download_progress("/tmp/depthboot-build/fedora-rootfs.tar.xz")
+                urlretrieve(f"https://github.com/eupnea-linux/fedora-rootfs/releases/latest/download/fedora-rootfs-"
+                            f"{distro_version}.tar.xz", filename="/tmp/depthboot-build/fedora-rootfs.tar.xz")
                 stop_download_progress()
             case "pop-os":
-                print_status(f"Downloading Pop!_OS iso {distro_version}")
-                start_download_progress("/tmp/depthboot-build/pop-os.iso")
+                print_status(f"Downloading pop-os rootfs from github")
+                start_download_progress("/tmp/depthboot-build/popos-rootfs.tar.xz")
                 urlretrieve(
-                    "https://iso.pop-os.org/22.04/amd64/intel/14/pop-os_22.04_amd64_intel_14.iso",
-                    filename="/tmp/depthboot-build/pop-os.iso")
+                    f"https://github.com/eupnea-linux/popos-rootfs/releases/latest/download/popos-rootfs.tar.xz",
+                    filename="/tmp/depthboot-build/popos-rootfs.tar.xz")
                 stop_download_progress()
     except URLError:
         print_error("Couldn't download rootfs. Check your internet connection and try again. If the error persists, "
@@ -240,13 +233,12 @@ def download_audio_scripts() -> None:
 
 
 # Create, mount, partition the img and flash the eupnea kernel
-def prepare_img(distro_name: str) -> Tuple[str, str]:
+def prepare_img(distro_name: str, img_size) -> Tuple[str, str]:
     print_status("Preparing image")
-    img_size = 10
     try:
         bash(f"fallocate -l {img_size}G depthboot.img")
     except subprocess.CalledProcessError:  # try fallocate, if it fails use dd
-        bash("dd if=/dev/zero of=depthboot.img status=progress bs=12884 count=1000070")
+        bash(f"dd if=/dev/zero of=depthboot.img status=progress bs=1024 count={img_size * 1000000}")
 
     print_status("Mounting empty image")
     mnt_point = bash("losetup -f --show depthboot.img")
@@ -256,7 +248,7 @@ def prepare_img(distro_name: str) -> Tuple[str, str]:
     return partition_and_flash_kernel(mnt_point, False, distro_name)
 
 
-# Prepare USB, usb is not yet fully implemented
+# Prepare USB/SD-card
 def prepare_usb(device: str, distro_name: str) -> Tuple[str, str]:
     print_status("Preparing USB")
 
@@ -332,7 +324,7 @@ def partition_and_flash_kernel(mnt_point: str, write_usb: bool, distro_name: str
 
 
 # extract the rootfs to /mnt/depthboot
-def extract_rootfs(distro_name: str) -> None:
+def extract_rootfs(distro_name: str, distro_version: str) -> None:
     print_status("Extracting rootfs")
     match distro_name:
         case "ubuntu":
@@ -340,14 +332,13 @@ def extract_rootfs(distro_name: str) -> None:
             # --checkpoint is for printing real tar progress
             bash("tar xfp /tmp/depthboot-build/ubuntu-rootfs.tar.xz -C /mnt/depthboot --checkpoint=.10000")
         case "debian":
-            print_status("Debootstraping into /mnt/depthboot")
+            print_status("Debootstraping Debian into /mnt/depthboot")
             start_progress()  # start fake progress
             # debootstrapping directly to /mnt/depthboot
-            debian_result = bash(
-                "debootstrap stable /mnt/depthboot https://deb.debian.org/debian/")
+            debian_result = bash("debootstrap stable /mnt/depthboot https://deb.debian.org/debian/")
             stop_progress()  # stop fake progress
             if debian_result.__contains__("Couldn't download packages:"):
-                print_error("Debootstrap failed, check your internet connection or try again later")
+                print_error("Debian Debootstrap failed, check your internet connection or try again later")
                 exit(1)
         case "arch":
             print_status("Extracting arch rootfs")
@@ -359,52 +350,18 @@ def extract_rootfs(distro_name: str) -> None:
             stop_progress(force_show=True)  # stop fake progress
         case "fedora":
             print_status("Extracting fedora rootfs")
-            # extract raw image to temp location
-            mkdir("/tmp/depthboot-build/fedora-tmp-mnt")
-            # using unxz instead of tar
-            bash("unxz -d /tmp/depthboot-build/fedora-rootfs.raw.xz -c > /tmp/depthboot-build/fedora-raw")
-
-            try:
-                bash("modprobe btrfs")  # some systems don't have btrfs module loaded by default.
-            except subprocess.CalledProcessError:  # Crostini doesnt have modprobe
-                pass
-
-            # mount fedora raw image as loop device
-            fedora_root_part = bash(
-                "losetup -P -f --show /tmp/depthboot-build/fedora-raw") + "p5"  # part 5 is the rootfs
-            bash(
-                f"mount {fedora_root_part} /tmp/depthboot-build/fedora-tmp-mnt")  # mount 5th root part as filesystem
-            print_status("Copying fedora rootfs to /mnt/depthboot")
-            cpdir("/tmp/depthboot-build/fedora-tmp-mnt/root/",
-                  "/mnt/depthboot/")  # copy mounted rootfs to /mnt/depthboot
-
-            # unmount fedora image to prevent errors and unused loop devices
-            try:
-                bash(f"umount -fl /tmp/depthboot-build/fedora-tmp-mnt")
-            except subprocess.CalledProcessError:  # fails on Crostini
-                pass
-            bash(f"losetup -d {fedora_root_part[:-2]}")
+            # --checkpoint is for printing real tar progress
+            bash("tar xfp /tmp/depthboot-build/fedora-rootfs.tar.xz -C /mnt/depthboot --checkpoint=.10000")
         case "pop-os":
-            print_status("Extracting Pop!_OS squashfs from iso. This may take a VERY VERY long while")
-            # Create a mount point for the iso to extract the squashfs
-            mkdir("/tmp/depthboot-build/iso")
-            mnt_iso = bash(f"losetup -f --show /tmp/depthboot-build/pop-os.iso")
-            mkdir("/tmp/depthboot-build/cdrom")
-            bash(f"mount {mnt_iso} /tmp/depthboot-build/cdrom")
-            start_progress()  # start fake progress
-            bash("unsquashfs -f -d /mnt/depthboot /tmp/depthboot-build/cdrom/casper/filesystem.squashfs")
-            stop_progress()  # stop fake progress
-            try:
-                bash("umount -fl /tmp/depthboot-build/cdrom")  # pop-os loop device
-                bash(f"losetup -d {mnt_iso} ")
-            except subprocess.CalledProcessError:
-                pass  # on crostini umount fails for some reason
+            print_status("Extracting popos rootfs")
+            # --checkpoint is for printing real tar progress
+            bash("tar xfp /tmp/depthboot-build/popos-rootfs.tar.xz -C /mnt/depthboot --checkpoint=.10000")
 
     print_status("\n" + "Rootfs extraction complete")
 
 
 # Configure distro agnostic options
-def post_extract(build_options, kernel_type: str) -> None:
+def post_extract(build_options, kernel_type: str, kernel_version: str, dev_release: bool) -> None:
     print_status("Applying distro agnostic configuration")
 
     # Extract modules
@@ -459,8 +416,10 @@ def post_extract(build_options, kernel_type: str) -> None:
     with open("configs/eupnea.json", "r") as settings_file:
         settings = json.load(settings_file)
     settings["kernel_type"] = kernel_type
-    # TODO: set kernel_version
+    settings["kernel_version"] = kernel_version
+    settings["kernel_dev"] = dev_release
     settings["distro_name"] = build_options["distro_name"]
+    settings["distro_version"] = build_options["distro_version"]
     settings["de_name"] = build_options["de_name"]
     if not build_options["device"] == "image":
         settings["install_type"] = "direct"
@@ -477,18 +436,12 @@ def post_extract(build_options, kernel_type: str) -> None:
     # Enable loading modules needed for depthboot
     cpfile("configs/eupnea-modules.conf", "/mnt/depthboot/etc/modules-load.d/eupnea-modules.conf")
 
-    # TODO: Fix failing services
-    # The services below fail to start, so they are disabled
-
-    # ssh
-    rmfile("/mnt/depthboot/etc/systemd/system/multi-user.target.wants/ssh.service")
-    rmfile("/mnt/depthboot/etc/systemd/system/sshd.service")
-
     username = build_options["username"]  # quotes interfere with functions below
     password = build_options["password"]  # quotes interfere with functions below
 
     # Do not pre-setup gnome, as there is a nice gui first time setup on first boot
-    if not build_options["de_name"] == "gnome":
+    # TODO: Change to gnome
+    if not build_options["de_name"] == "popos":
         print_status("Configuring user")
         chroot(f"useradd --create-home --shell /bin/bash {username}")
         # TODO: Fix ) and ( crashing chpasswd
@@ -504,11 +457,11 @@ def post_extract(build_options, kernel_type: str) -> None:
         host_time_zone = host_time_zone[host_time_zone.find("/usr/share/zoneinfo/"):].strip()  # get actual timezone
         chroot(f"ln -sf {host_time_zone} /etc/localtime")
 
-    print_status("Distro agnostic configuration complete")
+        print_status("Distro agnostic configuration complete")
 
 
 # post extract and distro config
-def post_config(rebind_search: bool, de_name: str) -> None:
+def post_config(rebind_search: bool, de_name: str, distro_name) -> None:
     if not de_name == "cli":
         # Add chromebook layout. Needs to be done after install Xorg
         print_status("Backing up default keymap and setting Chromebook layout")
@@ -531,6 +484,31 @@ def post_config(rebind_search: bool, de_name: str) -> None:
     cpdir("/tmp/depthboot-build/firmware", "/mnt/depthboot/lib/firmware")
     stop_progress(force_show=True)  # stop fake progress
 
+    if distro_name == "fedora":
+        # Fedora requires all files to be relabled for SELinux to work
+        # If this is not done, SELinux will prevent users from logging in
+        print_status("Relabeling files for SELinux")
+
+        # copy /proc files needed for fixfiles
+        mkdir("/mnt/depthboot/proc/self")
+        cpfile("configs/selinux/mounts", "/mnt/depthboot/proc/self/mounts")
+        cpfile("configs/selinux/mountinfo", "/mnt/depthboot/proc/self/mountinfo")
+
+        # copy /sys files needed for fixfiles
+        mkdir("/mnt/depthboot/sys/fs/selinux/initial_contexts/", create_parents=True)
+        cpfile("configs/selinux/unlabeled", "/mnt/depthboot/sys/fs/selinux/initial_contexts/unlabeled")
+
+        # Backup original selinux
+        cpfile("/mnt/depthboot/usr/sbin/fixfiles", "/mnt/depthboot/usr/sbin/fixfiles.bak")
+        # Copy patched fixfiles script
+        cpfile("configs/selinux/fixfiles", "/mnt/depthboot/usr/sbin/fixfiles")
+
+        chroot("/sbin/fixfiles -T 0 restore")
+
+        # Restore original fixfiles
+        cpfile("/mnt/depthboot/usr/sbin/fixfiles.bak", "/mnt/depthboot/usr/sbin/fixfiles")
+        rmfile("/mnt/depthboot/usr/sbin/fixfiles.bak")
+
 
 # chroot command
 def chroot(command: str) -> str:
@@ -538,8 +516,8 @@ def chroot(command: str) -> str:
 
 
 # The main build script
-def start_build(verbose: bool, local_path, kernel_type: str, dev_release: bool, build_options,
-                no_download_progress: bool = False) -> None:
+def start_build(verbose: bool, local_path, kernel_type: str, dev_release: bool, build_options, img_size: int = 10,
+                no_download_progress: bool = False, no_shrink: bool = False) -> None:
     if no_download_progress:
         disable_download_progress()  # disable download progress bar for non-interactive shells
     set_verbose(verbose)
@@ -548,8 +526,8 @@ def start_build(verbose: bool, local_path, kernel_type: str, dev_release: bool, 
     prepare_host(build_options["distro_name"])
 
     if local_path is None:  # default
-        download_kernel(kernel_type, dev_release)
-        download_rootfs(build_options["distro_name"], build_options["distro_version"], build_options["distro_link"])
+        kernel_version = download_kernel(kernel_type, dev_release)
+        download_rootfs(build_options["distro_name"], build_options["distro_version"])
         download_firmware()
         download_postinstall_scripts()
         download_audio_scripts()
@@ -568,7 +546,7 @@ def start_build(verbose: bool, local_path, kernel_type: str, dev_release: bool, 
                 cpfile(f"{local_path_posix}{file}", f"/tmp/depthboot-build/{file}")
             except FileNotFoundError:
                 print_error(f"File {file} not found in {local_path}, attempting to download")
-                download_kernel(kernel_type, dev_release, [file])
+                kernel_version = download_kernel(kernel_type, dev_release, [file])
 
         # copy distro agnostic files
         dirs = {
@@ -589,7 +567,7 @@ def start_build(verbose: bool, local_path, kernel_type: str, dev_release: bool, 
             "ubuntu": [cpfile, "ubuntu-rootfs.tar.xz"],
             "debian": [cpdir, "debian"],
             "arch": [cpfile, "arch-rootfs.tar.gz"],
-            "fedora": [cpfile, "fedora-rootfs.raw.xz"],
+            "fedora": [cpfile, "fedora-rootfs.tar.xz"],
             "pop-os": [cpfile, "pop-os.iso"]
         }
         if build_options["distro_name"] == "pop-os":
@@ -602,11 +580,11 @@ def start_build(verbose: bool, local_path, kernel_type: str, dev_release: bool, 
         except FileNotFoundError:
             print_error(f"File {distro_rootfs[build_options['distro_name']][1]} not found in {local_path}, "
                         f"attempting to download")
-            download_rootfs(build_options["distro_name"], build_options["distro_version"], build_options["distro_link"])
+            download_rootfs(build_options["distro_name"], build_options["distro_version"])
 
     # Setup device
     if build_options["device"] == "image":
-        output_temp = prepare_img(build_options["distro_name"])
+        output_temp = prepare_img(build_options["distro_name"], img_size)
         img_mnt = output_temp[0]
         root_partuuid = output_temp[1]
     else:
@@ -615,8 +593,8 @@ def start_build(verbose: bool, local_path, kernel_type: str, dev_release: bool, 
         root_partuuid = output_temp[1]
 
     # Extract rootfs and configure distro agnostic settings
-    extract_rootfs(build_options["distro_name"])
-    post_extract(build_options, kernel_type)
+    extract_rootfs(build_options["distro_name"], build_options["distro_version"])
+    post_extract(build_options, kernel_type, kernel_version, dev_release)
 
     match build_options["distro_name"]:
         case "ubuntu":
@@ -635,7 +613,7 @@ def start_build(verbose: bool, local_path, kernel_type: str, dev_release: bool, 
     distro.config(build_options["de_name"], build_options["distro_version"], build_options["username"], root_partuuid,
                   verbose)
 
-    post_config(build_options["rebind_search"], build_options["de_name"])
+    post_config(build_options["rebind_search"], build_options["de_name"], build_options["distro_name"])
 
     # Post-install cleanup
     print_status("Cleaning up host system after build")
@@ -646,23 +624,33 @@ def start_build(verbose: bool, local_path, kernel_type: str, dev_release: bool, 
     except subprocess.CalledProcessError as error:  # on crostini umount fails for some reason
         if verbose:
             print(error)
+    sleep(5)  # wait for umount to finish
     try:
         bash("umount -f /mnt/depthboot")  # umount mountpoint again
     except subprocess.CalledProcessError as error:  # on crostini umount fails for some reason
         if verbose:
             print(error)
     if build_options["device"] == "image":
-        # Shrink image to actual size
-        print_status("Shrinking image")
-        sleep(5)  # wait for umount to finish
-        bash(f"e2fsck -fpv {img_mnt}p2")  # Force check filesystem for errors
-        bash(f"resize2fs -f -M {img_mnt}p2")
-        block_count = int(bash(f"dumpe2fs -h {img_mnt}p2 | grep 'Block count:'")[12:].split()[0])
-        actual_fs_in_bytes = block_count * 4096
-        # the kernel part is always the same size -> sector amount: 131072 * 512 => 67108864 bytes
-        actual_fs_in_bytes += 67108864
-        actual_fs_in_bytes += 102400  # add 100kb for linux to be able to boot
-        bash(f"truncate --size={actual_fs_in_bytes} ./depthboot.img")
+        try:
+            with open("/sys/devices/virtual/dmi/id/product_name", "r") as file:
+                product_name = file.read().strip()
+        except FileNotFoundError:  # WSL doesnt have dmi data
+            product_name = ""
+        # TODO: Fix shrinking on Crostini
+        if not product_name == "crosvm" and not no_shrink:
+            # Shrink image to actual size
+            print_status("Shrinking image")
+            bash(f"e2fsck -fpv {img_mnt}p2")  # Force check filesystem for errors
+            bash(f"resize2fs -f -M {img_mnt}p2")
+            block_count = int(bash(f"dumpe2fs -h {img_mnt}p2 | grep 'Block count:'")[12:].split()[0])
+            actual_fs_in_bytes = block_count * 4096
+            # the kernel part is always the same size -> sector amount: 131072 * 512 => 67108864 bytes
+            actual_fs_in_bytes += 67108864
+            actual_fs_in_bytes += 102400  # add 100kb for linux to be able to boot
+            bash(f"truncate --size={actual_fs_in_bytes} ./depthboot.img")
+        if product_name == "crosvm":
+            # rename the image to .bin for the chromeos recovery utility to be able to flash it
+            bash(f"mv ./depthboot.img ./depthboot.bin")
 
         bash(f"losetup -d {img_mnt}")
         print_header(f"The ready-to-boot Depthboot image is located at {get_full_path('.')}/depthboot.img")

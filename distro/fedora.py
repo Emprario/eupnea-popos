@@ -7,13 +7,14 @@ def config(de_name: str, distro_version: str, username: str, root_partuuid: str,
 
     print("Installing dependencies")
     start_progress()  # start fake progress
-    chroot("dnf update -y")  # update repos list
+    chroot(f"dnf install -y --releasever={distro_version} fedora-release")  # update repos list
     # Install core packages
     chroot("dnf group install -y 'Core'")
-    # Install hardware support packages
+    # Install firmware packages
     chroot("dnf group install -y 'Hardware Support'")
     chroot("dnf group install -y 'Common NetworkManager Submodules'")
     chroot("dnf install -y linux-firmware")
+    chroot("dnf install -y git vboot-utils rsync cloud-utils")  # postinstall dependencies
     # Add RPMFusion repos
     chroot(f"dnf install -y https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-"
            f"{distro_version}.noarch.rpm")
@@ -30,23 +31,27 @@ def config(de_name: str, distro_version: str, username: str, root_partuuid: str,
         case "kde":
             print_status("Installing KDE")
             chroot("dnf group install -y 'KDE Plasma Workspaces'")
-        case "mate":
-            print_status("Installing MATE")
-            chroot("dnf group install -y 'MATE Desktop'")
+            chroot("dnf install -y firefox")
         case "xfce":
             print_status("Installing Xfce")
             chroot("dnf group install -y 'Xfce Desktop'")
+            chroot("dnf install -y firefox gnome-software")
         case "lxqt":
             print_status("Installing LXQt")
             chroot("dnf group install -y 'LXQt Desktop'")
+            chroot("dnf install -y plasma-discover")
         case "deepin":
             print_status("Installing deepin")
             chroot("dnf group install -y 'Deepin Desktop'")
+            chroot("dnf install -y plasma-discover")
         case "budgie":
-            print_error("Budgie is not available for Fedora")
-            exit(1)
+            print_status("Installing Budgie")
+            chroot("dnf install -y budgie-desktop lightdm lightdm-gtk xorg-x11-server-Xorg gnome-terminal firefox "
+                   "gnome-software")
         case "cli":
             print_status("Skipping desktop environment install")
+            # install network tui
+            chroot("dnf install -y NetworkManager-tui")
         case _:
             print_error("Invalid desktop environment! Please create an issue")
             exit(1)
@@ -57,31 +62,11 @@ def config(de_name: str, distro_version: str, username: str, root_partuuid: str,
         chroot("systemctl set-default graphical.target")
     print_status("Desktop environment setup complete")
 
-    # Create /.autorelabel to force SELinux to relabel all files
-    # If this is not done, the system won't let users login, even if set to permissive
-    with open("/mnt/depthboot/.autorelabel", "w") as f:
-        f.write("")
+    print_status("Adding fedora modules")
+    with open("/mnt/depthboot/etc/modules-load.d/eupnea-modules.conf", "a") as f:
+        f.write("# Fedora modules\nsunrpc\n")
 
-    # The default fstab file has the wrong PARTUUID -> system boots in emergency mode if not fixed
-    with open("configs/fstab/fedora.fstab", "r") as f:
-        fstab = f.read()
-    fstab = fstab.replace("insert_partuuid", root_partuuid)
-    with open("/mnt/depthboot/etc/fstab", "w") as f:
-        f.write(fstab)
-
-    # TODO: Fix zram
-    chroot("dnf remove zram-generator-defaults -y")  # remove zram as it fails for some reason
-    chroot("systemctl disable systemd-zram-setup@zram0.service")  # disable zram service
-
-    # Add depthboot to version(this is purely cosmetic)
-    with open("/mnt/depthboot/etc/os-release", "r") as f:
-        os_release = f.read()
-    os_release = os_release.replace("Cloud Edition Prerelease", "Depthboot")
-    os_release = os_release.replace("Cloud Edition", "Depthboot")
-    with open("/mnt/depthboot/etc/os-release", "w") as f:
-        f.write(os_release)
-
-    print_status("Debian setup complete")
+    print_status("Fedora setup complete")
 
 
 def chroot(command: str) -> None:
