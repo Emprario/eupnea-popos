@@ -2,6 +2,7 @@ from functions import *
 
 
 def config(de_name: str, distro_version: str, username: str, root_partuuid: str, verbose: bool) -> None:
+    minimal = False
     set_verbose(verbose)
     print_status("Configuring Arch")
 
@@ -49,7 +50,9 @@ def config(de_name: str, distro_version: str, username: str, root_partuuid: str,
     match de_name:
         case "gnome":
             print_status("Installing GNOME")
-            chroot("pacman -S --noconfirm gnome gnome-extra gnome-initial-setup")
+            chroot("pacman -S --noconfirm gnome gnome-initial-setup")
+            if not minimal:
+                chroot("pacman -S --noconfirm gnome-extra")
             chroot("systemctl enable gdm.service")
         case "kde":
             print_status("Installing KDE")
@@ -73,8 +76,10 @@ def config(de_name: str, distro_version: str, username: str, root_partuuid: str,
             chroot("systemctl enable sddm.service")
         case "deepin":
             print_status("Installing deepin")
-            chroot("pacman -S --noconfirm deepin deepin-kwin deepin-extra xorg xorg-server lightdm kde-applications "
+            chroot("pacman -S --noconfirm deepin deepin-kwin xorg xorg-server lightdm kde-applications "
                    "firefox discover packagekit-qt5")
+            if not minimal:
+                chroot("pacman -S --noconfirm deepin-extra")
             # enable deepin specific login style
             with open("/mnt/depthboot/etc/lightdm/lightdm.conf", "a") as conf:
                 conf.write("greeter-session=lightdm-deepin-greeter")
