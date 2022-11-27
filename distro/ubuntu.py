@@ -2,6 +2,12 @@ from functions import *
 import os
 
 
+def purge(*pkgs: str) -> None:
+    for pkg in pkgs:
+        string = string + pkg + " "
+    chroot(f"apt-get purge -y {string}")
+
+
 def config(de_name: str, distro_version: str, username: str, root_partuuid: str, verbose: bool) -> None:
     set_verbose(verbose)
     print_status("Configuring Ubuntu")
@@ -15,12 +21,15 @@ def config(de_name: str, distro_version: str, username: str, root_partuuid: str,
     }
     # add missing apt sources
     with open("/mnt/depthboot/etc/apt/sources.list", "a") as file:
-        file.write(f"\ndeb http://archive.ubuntu.com/ubuntu {ubuntu_versions_codenames[distro_version]}-backports main "
-                   "restricted universe multiverse\n")
-        file.write(f"\ndeb http://security.ubuntu.com/ubuntu {ubuntu_versions_codenames[distro_version]}-security main"
-                   f" restricted universe multiverse\n")
-        file.write(f"\ndeb http://archive.ubuntu.com/ubuntu {ubuntu_versions_codenames[distro_version]}-updates main "
-                   f"restricted universe multiverse\n")
+        file.write(
+            f"\ndeb http://archive.ubuntu.com/ubuntu {ubuntu_versions_codenames[distro_version]}-backports main "
+            "restricted universe multiverse\n")
+        file.write(
+            f"\ndeb http://security.ubuntu.com/ubuntu {ubuntu_versions_codenames[distro_version]}-security main"
+            f" restricted universe multiverse\n")
+        file.write(
+            f"\ndeb http://archive.ubuntu.com/ubuntu {ubuntu_versions_codenames[distro_version]}-updates main "
+            f"restricted universe multiverse\n")
 
     print_status("Installing dependencies")
     chroot("apt-get update -y")
@@ -43,7 +52,7 @@ def config(de_name: str, distro_version: str, username: str, root_partuuid: str,
             chroot("apt-get install -y xubuntu-desktop")
             if minimal:
                 chroot("apt-get purge -y gimp gnome-font-viewer gnome-mines gnome-sudoku gucharmap"
-                " hexchat libreoffice-* mate-calc pastebinit synaptic thunderbird transmission-gtk")
+                       " hexchat libreoffice-* mate-calc pastebinit synaptic thunderbird transmission-gtk")
             chroot("apt-get install -y nano gnome-software epiphany-browser")
         case "lxqt":
             print_status("Installing LXQt")
@@ -65,8 +74,9 @@ def config(de_name: str, distro_version: str, username: str, root_partuuid: str,
         case "budgie":
             print_status("Installing Budgie")
             # do not install tex-common, it breaks the installation
-            chroot("DEBIAN_FRONTEND=noninteractive apt-get install -y lightdm lightdm-gtk-greeter ubuntu-budgie-desktop"
-                   " tex-common-")
+            chroot(
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y lightdm lightdm-gtk-greeter ubuntu-budgie-desktop"
+                " tex-common-")
         case "cli":
             print_status("Skipping desktop environment install")
         case _:
