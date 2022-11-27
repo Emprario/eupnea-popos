@@ -3,3 +3,5 @@ depthboot.img
 kernel.flags
 /__pycache__/
 /venv/
+/.github/
+/.fleet/
