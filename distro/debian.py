@@ -34,7 +34,7 @@ def config(de_name: str, distro_version: str, username: str, root_partuuid: str,
     match de_name:
         case "gnome":
             print_status("Installing GNOME")
-            chroot("DEBIAN_FRONTEND=noninteractive apt-get install -y gnome/stable gnome-initial-setup")
+            chroot("DEBIAN_FRONTEND=noninteractive apt-get install -y gnome gnome-initial-setup")
         case "kde":
             print_status("Installing KDE")
             chroot("DEBIAN_FRONTEND=noninteractive apt-get install -y task-kde-desktop")
@@ -81,6 +81,18 @@ def config(de_name: str, distro_version: str, username: str, root_partuuid: str,
     print_status("Upgrading touchpad drivers")
     chroot("apt-get remove -y xserver-xorg-input-synaptics")
     chroot("apt-get install -y xserver-xorg-input-libinput")
+
+    # Move to unstable
+    if distro_version == "unstable"
+        with open("/mnt/depthboot/etc/apt/sources.list", "r") as file:
+            original_sources = file.readlines()
+        sources = original_sources
+        sources[0] = sources[0].replace("stable", "unstable")
+        with open("/mnt/depthboot/etc/apt/sources.list", "w") as file:
+            file.writelines(sources)
+        chroot("apt-get update -y")
+        chroot("apt-get upgrade -y")
+        chroot("apt-get dist-upgrade -y")
 
     # TODO: Pre-update python3 to 3.10
     # Pre-updating to python3.10 breaks the gnome first time installer...

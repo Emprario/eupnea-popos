@@ -43,15 +43,27 @@ def get_user_input(skip_device: bool = False) -> dict:
                         continue
                 break
             case "debian":
-                print_warning("Warning: The audio and some postinstall scripts are not supported on debian by default.")
-                if input("\033[94mType 'yes' to continue anyways or Press Enter to choose another distro" +
-                         "\033[0m\n") == "yes":
-                    print("Debian stable selected")
-                    output_dict["distro_name"] = "debian"
-                    output_dict["distro_version"] = "stable"
-                    # TODO: Add non stable debian versions
-                    break
-                continue
+                while True:
+                    ver = input("\033[94mPress enter for the default (unstable), or type 'stable' to use the stable branch (NOT RECOMMENDED)\033[0m\n")
+                    if ver == "stable" or ver == "bullseye":
+                        print_warning("Warning: The audio and some postinstall scripts are not supported on debian by on 'stable'.")
+                        if input("\033[94mType 'yes' to continue anyways or Press Enter to choose another distro" +
+                                "\033[0m\n") == "yes":
+                            print("Debian stable selected")
+                            output_dict["distro_name"] = "debian"
+                            output_dict["distro_version"] = "stable"
+                            # TODO: Add non stable debian versions
+                            break
+                        else:
+                            continue
+                    elif ver == "" or ver == "unstable" or ver == "sid":
+                        print("Debian unstable selected")
+                        output_dict["distro_name"] = "debian"
+                        output_dict["distro_version"] = "unstable"
+                        break
+                    else:
+                        print_warning("Version not available, please choose another")
+                break
             case "arch" | "arch btw":
                 print("Arch selected")
                 output_dict["distro_name"] = "arch"
